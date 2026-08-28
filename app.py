@@ -12,12 +12,14 @@ api_key = st.secrets.get("MP_API_KEY", None)
 
 # Presets
 st.sidebar.subheader("Quick Presets")
+is_metal = st.sidebar.checkbox("Only metals (zero band gap)", value=False)
 preset = st.sidebar.selectbox("Load a preset", [
     "None (custom)", 
     "Battery Materials (Li-containing, stable)",
     "Solar Cell Absorbers (1-2 eV gap, stable)",
     "Magnets / Metals (zero gap)",
     "Oxides Only (O-containing, stable)"
+    
 ])
 
 max_elements = st.sidebar.slider("Max elements", 1, 5, 3)
