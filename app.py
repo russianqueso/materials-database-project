@@ -201,7 +201,7 @@ if "structures" in st.session_state and len(st.session_state.structures) > 0:
     col_a.metric("Lattice a", f"{struct.lattice.a:.3f} Å")
     col_b.metric("Lattice b", f"{struct.lattice.b:.3f} Å")
     col_c.metric("Lattice c", f"{struct.lattice.c:.3f} Å")
-else:
+    else:
     st.info("No structure data available.")
     # Plot 1
     st.subheader("📊 Band Gap vs. Density")
