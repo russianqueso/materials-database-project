@@ -9,7 +9,7 @@ st.markdown("Screen real materials from the Materials Project database")
 
 # --- Sidebar ---
 st.sidebar.header("Settings")
-api_key = st.sidebar.text_input("Paste your Materials Project API Key", type="password")
+api_key = st.secrets.get("MP_API_KEY", None)
 
 # Presets
 st.sidebar.subheader("Quick Presets")
