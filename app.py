@@ -4,7 +4,7 @@ from mp_api.client import MPRester
 import pandas as pd
 
 st.set_page_config(page_title="Materials Explorer", layout="wide")
-st.title("🔬 Materials Science Dashboard")
+st.title("Materials Science Dashboard")
 st.markdown("Screen real materials from the Materials Project database")
 
 # --- Sidebar ---
@@ -14,10 +14,10 @@ api_key = st.secrets.get("MP_API_KEY", None)
 st.sidebar.subheader("Quick Presets")
 preset = st.sidebar.selectbox("Load a preset", [
     "None (custom)", 
-    "🔋 Battery Materials (Li-containing, stable)",
-    "☀️ Solar Cell Absorbers (1-2 eV gap, stable)",
-    "🧲 Magnets / Metals (zero gap)",
-    "🧪 Oxides Only (O-containing, stable)"
+    "Battery Materials (Li-containing, stable)",
+    "Solar Cell Absorbers (1-2 eV gap, stable)",
+    "Magnets / Metals (zero gap)",
+    "Oxides Only (O-containing, stable)"
 ])
 
 max_elements = st.sidebar.slider("Max elements", 1, 5, 3)
@@ -28,16 +28,16 @@ only_stable = st.sidebar.checkbox("Only stable materials", value=False)
 chunk_size = st.sidebar.slider("Max results", 100, 2000, 500)
 
 # Apply presets
-if preset == "🔋 Battery Materials (Li-containing, stable)":
+if preset == "Battery Materials (Li-containing, stable)":
     elements = "Li"
     only_stable = True
     min_gap, max_gap = 0.0, 5.0
-elif preset == "☀️ Solar Cell Absorbers (1-2 eV gap, stable)":
+elif preset == "Solar Cell Absorbers (1-2 eV gap, stable)":
     min_gap, max_gap = 1.0, 2.0
     only_stable = True
-elif preset == "🧲 Magnets / Metals (zero gap)":
+elif preset == "Magnets / Metals (zero gap)":
     min_gap, max_gap = 0.0, 0.1
-elif preset == "🧪 Oxides Only (O-containing, stable)":
+elif preset == "Oxides Only (O-containing, stable)":
     elements = "O"
     only_stable = True
 
@@ -141,10 +141,9 @@ else:
     st.markdown("""
     ### 👋 Welcome to the Materials Explorer
     
-    **What this tool does:** It queries the real Materials Project database (150,000+ computed compounds) and lets you filter by properties that matter for real applications.
+    **What this tool does:** It queries the real Materials Project database and lets you filter by properties that matter for real applications.
     
     **How to use it:**
-    1. Paste your API key
     2. Pick a **preset** (battery materials, solar cells, etc.) or set custom filters
     3. Click **Load Materials**
     
