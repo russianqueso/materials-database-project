@@ -139,7 +139,7 @@ if "df" in st.session_state:
     
 else:
     st.markdown("""
-    ### 👋 Welcome to the Materials Explorer
+    ###Welcome to the Materials Explorer!
     
     **What this tool does:** It queries the real Materials Project database and lets you filter by properties that matter for real applications.
     
