@@ -85,9 +85,9 @@ if load_button:
                 st.stop()
             structures = {}
             data = []
-                if d.structure:
+            if d.structure:
     structures[d.formula_pretty] = d.structure
-            for d in docs:
+                for d in docs:
                 data.append({
                     "Material ID": d.material_id,
                     "Formula": d.formula_pretty,
