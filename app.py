@@ -42,7 +42,8 @@ elif preset == "Magnets / Metals (zero gap)":
 elif preset == "Oxides Only (O-containing, stable)":
     elements = "O"
     only_stable = True
-
+if is_metal:
+    min_gap, max_gap = 0.0, 0.1
 load_button = st.sidebar.button("Load Materials", type="primary")
 
 # --- Fetch Data ---
