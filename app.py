@@ -131,7 +131,12 @@ if "df" in st.session_state:
     if "structures" in st.session_state and len(st.session_state.structures) > 0:
         selected = st.selectbox("Select material to visualize:", list(st.session_state.structures.keys()))
         struct = st.session_state.structures[selected]
-        struct = struct.get_conventional_standard_structure()
+        try:
+    from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+    sga = SpacegroupAnalyzer(struct)
+    struct = sga.get_conventional_standard_structure()
+except Exception:
+    pass  # If conversion fails, just show the primitive cell
 
         
         coords = struct.cart_coords
