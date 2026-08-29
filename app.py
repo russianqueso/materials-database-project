@@ -90,7 +90,7 @@ if load_button or auto_load:
                     "Band Gap (eV)": round(d.band_gap, 3) if d.band_gap is not None else 0,
                     "Density (g/cm³)": round(d.density, 3) if d.density is not None else 0,
                     "Volume (Å³)": round(d.volume, 2) if d.volume is not None else 0,
-                    "Crystal System": d.symmetry.crystal_system.title() if d.symmetry else "Unknown",
+                    "Crystal System": str(d.symmetry.crystal_system) if d.symmetry else "Unknown",
                     "Energy Above Hull (eV/atom)": round(d.energy_above_hull, 4) if d.energy_above_hull is not None else 0,
                     "Stable": "Yes" if d.is_stable else "No"
                 })
