@@ -11,6 +11,10 @@ st.markdown("Screen real materials from the Materials Project database")
 # --- Sidebar ---
 api_key = st.secrets.get("MP_API_KEY", None)
 
+if not api_key:
+    st.error("API key not configured. Add MP_API_KEY to Streamlit secrets.")
+    st.stop()
+
 # Presets
 st.sidebar.subheader("Quick Presets")
 is_metal = st.sidebar.checkbox("Only metals (zero band gap)", value=False)
@@ -20,7 +24,6 @@ preset = st.sidebar.selectbox("Load a preset", [
     "Solar Cell Absorbers (1-2 eV gap, stable)",
     "Magnets / Metals (zero gap)",
     "Oxides Only (O-containing, stable)"
-    
 ])
 
 max_elements = st.sidebar.slider("Max elements", 1, 5, 3)
@@ -43,50 +46,43 @@ elif preset == "Magnets / Metals (zero gap)":
 elif preset == "Oxides Only (O-containing, stable)":
     elements = "O"
     only_stable = True
+
 if is_metal:
     min_gap, max_gap = 0.0, 0.1
+
 load_button = st.sidebar.button("Load Materials", type="primary")
+auto_load = "df" not in st.session_state
 
 # --- Fetch Data ---
-if load_button:
-    if not api_key or len(api_key.strip()) == 0:
-        st.error("Paste your API key first.")
-        st.stop()
-    
-    key_clean = api_key.strip()
-    st.info(f"Querying with key ...{key_clean[-4:]}")
-    
+if load_button or auto_load:
     with st.spinner("Fetching data..."):
         try:
-            with MPRester(key_clean) as mpr:
-                # Build query
+            with MPRester(api_key) as mpr:
                 query = {
                     "num_elements": (1, max_elements),
                     "band_gap": (min_gap, max_gap),
                     "fields": ["material_id", "formula_pretty", "band_gap",
-                               "density", "volume", "structure","symmetry", "energy_above_hull",
-                               "is_stable", "elements"],
+                               "density", "volume", "structure", "symmetry", 
+                               "energy_above_hull", "is_stable", "elements"],
                     "num_chunks": 1,
                     "chunk_size": chunk_size
                 }
                 
-                # Add stability filter
                 if only_stable:
                     query["energy_above_hull"] = (0, 0.05)
                 
-                # Add element filter
                 if elements.strip():
-                    query["elements"] = [e.strip() for e in elements.split(",")]
+                    query["elements"] = [e.strip() for e in elements.split(",") if e.strip()]
                 
                 docs = mpr.materials.summary.search(**query)
             
             if len(docs) == 0:
                 st.warning("No materials match those filters.")
                 st.stop()
+            
             structures = {}
             data = []
-            if d.structure:
-                structures[d.formula_pretty] = d.structure
+            
             for d in docs:
                 data.append({
                     "Material ID": d.material_id,
@@ -94,10 +90,12 @@ if load_button:
                     "Band Gap (eV)": round(d.band_gap, 3) if d.band_gap is not None else 0,
                     "Density (g/cm³)": round(d.density, 3) if d.density is not None else 0,
                     "Volume (Å³)": round(d.volume, 2) if d.volume is not None else 0,
-                    "Crystal System": d.symmetry.crystal_system if d.symmetry else "Unknown",
+                    "Crystal System": d.symmetry.crystal_system.title() if d.symmetry else "Unknown",
                     "Energy Above Hull (eV/atom)": round(d.energy_above_hull, 4) if d.energy_above_hull is not None else 0,
-                    "Stable": "✅ Yes" if d.is_stable else "❌ No"
+                    "Stable": "Yes" if d.is_stable else "No"
                 })
+                if d.structure:
+                    structures[d.formula_pretty] = d.structure
             
             df = pd.DataFrame(data)
             st.session_state.df = df
@@ -122,12 +120,12 @@ if "df" in st.session_state:
     # Table
     st.subheader("📋 Materials Table")
     sort_by = st.selectbox("Sort by", ["Energy Above Hull (eV/atom)", "Band Gap (eV)", 
-                                         "Density (g/cm³)", "Form. Energy (eV/atom)", "Atoms/Cell"])
+                                         "Density (g/cm³)", "Volume (Å³)"])
     ascending = st.checkbox("Ascending", value=True)
     st.dataframe(df.sort_values(sort_by, ascending=ascending), use_container_width=True, height=400)
     
     # --- 3D CRYSTAL STRUCTURE VIEWER ---
-    st.subheader("🧊 3D Crystal Structure Viewer")
+    st.subheader("3D Crystal Structure Viewer")
     st.markdown("Select a material from the table above to view its atomic structure.")
     
     if "structures" in st.session_state and len(st.session_state.structures) > 0:
@@ -209,25 +207,23 @@ if "df" in st.session_state:
         st.info("No structure data available.")
     
     # --- Plots ---
-    st.subheader("📊 Band Gap vs. Density")
+    st.subheader("Band Gap vs. Density")
     fig1 = px.scatter(df, x="Density (g/cm³)", y="Band Gap (eV)", color="Crystal System",
                       hover_data=["Formula", "Material ID", "Stable"], 
                       size="Volume (Å³)", opacity=0.7)
     st.plotly_chart(fig1, use_container_width=True)
     
-    st.subheader("📈 Band Gap Distribution")
+    st.subheader("Band Gap Distribution")
     fig2 = px.histogram(df, x="Band Gap (eV)", color="Crystal System", nbins=30, marginal="box")
     st.plotly_chart(fig2, use_container_width=True)
     
-    st.subheader("🎯 Stability Map")
+    st.subheader("Stability Map")
     fig3 = px.scatter(df, x="Band Gap (eV)", y="Energy Above Hull (eV/atom)",
                       color="Stable", hover_data=["Formula"], log_y=True)
     st.plotly_chart(fig3, use_container_width=True)
     
     csv = df.to_csv(index=False)
-    st.download_button("⬇️ Download CSV", csv, "materials_screening.csv", "text/csv")
-
-
+    st.download_button("Download CSV", csv, "materials_screening.csv", "text/csv")
     
 else:
     st.markdown("""
@@ -236,8 +232,8 @@ else:
     **What this tool does:** It queries the real Materials Project database and lets you filter by properties that matter for real applications.
     
     **How to use it:**
-    2. Pick a **preset** (battery materials, solar cells, etc.) or set custom filters
-    3. Click **Load Materials**
+    1. Pick a **preset** (battery materials, solar cells, etc.) or set custom filters
+    2. Click **Load Materials**
     
     **Key concepts:**
     - **Band Gap** → 0 = metal, 0.1–3 = semiconductor, >3 = insulator
