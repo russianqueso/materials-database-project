@@ -227,30 +227,7 @@ if "df" in st.session_state:
     csv = df.to_csv(index=False)
     st.download_button("⬇️ Download CSV", csv, "materials_screening.csv", "text/csv")
 
-else:
-    st.info("Loading materials automatically... please wait.")
-    else:
-    st.info("No structure data available.")
-    # Plot 1
-    st.subheader("📊 Band Gap vs. Density")
-    fig1 = px.scatter(df, x="Density (g/cm³)", y="Band Gap (eV)", color="Crystal System",
-                      hover_data=["Formula", "Material ID", "Stable"], size="Volume (Å³)", opacity=0.7)
-    st.plotly_chart(fig1, use_container_width=True)
-    
-    # Plot 2
-    st.subheader("📈 Band Gap Distribution")
-    fig2 = px.histogram(df, x="Band Gap (eV)", color="Crystal System", nbins=30)
-    st.plotly_chart(fig2, use_container_width=True)
-    
-    # Plot 3
-    st.subheader("🎯 Stability Map (Lower = More Stable)")
-    fig3 = px.scatter(df, x="Band Gap (eV)", y="Energy Above Hull (eV/atom)",
-                      color="Stable", hover_data=["Formula"], log_y=True)
-    st.plotly_chart(fig3, use_container_width=True)
-    
-    # Download
-    csv = df.to_csv(index=False)
-    st.download_button("Download CSV", csv, "materials_screening.csv", "text/csv")
+
     
 else:
     st.markdown("""
