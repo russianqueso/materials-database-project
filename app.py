@@ -135,8 +135,8 @@ if "df" in st.session_state:
             from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
             sga = SpacegroupAnalyzer(struct)
             struct = sga.get_conventional_standard_structure()
-            except Exception:
-                pass  # If conversion fails, just show the primitive cell
+        except Exception:
+            pass  # If conversion fails, just show the primitive cell
 
         
         coords = struct.cart_coords
