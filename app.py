@@ -136,6 +136,7 @@ if "df" in st.session_state:
         from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
         sga = SpacegroupAnalyzer(struct)
         struct = sga.get_conventional_standard_structure()
+        coords = struct.cart_coords
         species = [str(site.specie) for site in struct]
         
         color_map = {
