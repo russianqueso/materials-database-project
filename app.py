@@ -112,7 +112,7 @@ if load_button:
 if "df" in st.session_state:
     df = st.session_state.df
     
-    # Stats
+    # Summary stats
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Total", len(df))
     c2.metric("Stable", (df["Stable"] == "✅ Yes").sum())
@@ -121,18 +121,22 @@ if "df" in st.session_state:
     
     # Table
     st.subheader("📋 Materials Table")
-    st.dataframe(df.sort_values("Energy Above Hull (eV/atom)"), use_container_width=True, height=400)
-    # PASTE THIS AFTER st.dataframe(...)
-st.subheader("🧊 3D Crystal Structure Viewer")
-st.markdown("Select a material to view its atomic structure.")
-
-    if "structures" in st.session_state and len(st.session_state.structures) > 0:
-        selected = st.selectbox("Select material:", list(st.session_state.structures.keys()))
-        struct = st.session_state.structures[selected]
+    sort_by = st.selectbox("Sort by", ["Energy Above Hull (eV/atom)", "Band Gap (eV)", 
+                                         "Density (g/cm³)", "Form. Energy (eV/atom)", "Atoms/Cell"])
+    ascending = st.checkbox("Ascending", value=True)
+    st.dataframe(df.sort_values(sort_by, ascending=ascending), use_container_width=True, height=400)
     
+    # --- 3D CRYSTAL STRUCTURE VIEWER ---
+    st.subheader("🧊 3D Crystal Structure Viewer")
+    st.markdown("Select a material from the table above to view its atomic structure.")
+    
+    if "structures" in st.session_state and len(st.session_state.structures) > 0:
+        selected = st.selectbox("Select material to visualize:", list(st.session_state.structures.keys()))
+        struct = st.session_state.structures[selected]
+        
         coords = struct.cart_coords
         species = [str(site.specie) for site in struct]
-    
+        
         color_map = {
             "H": "#FFFFFF", "He": "#D9FFFF", "Li": "#CC80FF", "Be": "#C2FF00",
             "B": "#FFB5B5", "C": "#909090", "N": "#3050F8", "O": "#FF0D0D",
@@ -142,7 +146,7 @@ st.markdown("Select a material to view its atomic structure.")
             "V": "#A6A6AB", "Cr": "#8A99C7", "Mn": "#9C7AC7", "Fe": "#E06633",
             "Co": "#F090A0", "Ni": "#50D050", "Cu": "#C78033", "Zn": "#7D80B0",
             "Ga": "#C28F8F", "Ge": "#668F8F", "As": "#BD80E3", "Se": "#FFA100",
-             "Br": "#A62929", "Rb": "#702EB0", "Sr": "#00FF00", "Y": "#94FFFF",
+            "Br": "#A62929", "Rb": "#702EB0", "Sr": "#00FF00", "Y": "#94FFFF",
             "Zr": "#94E0E0", "Nb": "#73C2C9", "Mo": "#54B5B5", "Tc": "#3B9E9E",
             "Ru": "#248F8F", "Rh": "#0A7D8C", "Pd": "#006985", "Ag": "#C0C0C0",
             "Cd": "#FFD98F", "In": "#A67573", "Sn": "#668080", "Sb": "#9E63B5",
@@ -163,7 +167,7 @@ st.markdown("Select a material to view its atomic structure.")
         colors = [color_map.get(s, "#888888") for s in species]
         sizes = [25 if s in ["H", "He"] else 35 if s in ["C", "N", "O", "F", "Ne"] 
                  else 50 if s in ["Na", "Mg", "Al", "Si", "P", "S", "Cl"] else 65 for s in species]
-    
+        
         fig_3d = go.Figure(data=[go.Scatter3d(
             x=coords[:, 0], y=coords[:, 1], z=coords[:, 2],
             mode='markers',
@@ -171,7 +175,7 @@ st.markdown("Select a material to view its atomic structure.")
             text=species,
             hovertemplate='<b>%{text}</b><br>x: %{x:.3f} Å<br>y: %{y:.3f} Å<br>z: %{z:.3f} Å<extra></extra>'
         )])
-    
+        
         lattice = struct.lattice
         corners = [[0,0,0], [1,0,0], [1,1,0], [0,1,0], [0,0,1], [1,0,1], [1,1,1], [0,1,1]]
         corner_coords = [lattice.get_cartesian_coords(c) for c in corners]
@@ -182,7 +186,7 @@ st.markdown("Select a material to view its atomic structure.")
             z = [corner_coords[edge[0]][2], corner_coords[edge[1]][2]]
             fig_3d.add_trace(go.Scatter3d(x=x, y=y, z=z, mode='lines',
                 line=dict(color='gray', width=2), hoverinfo='skip', showlegend=False))
-    
+        
         fig_3d.update_layout(
             title=dict(text=f"Crystal Structure: {selected}  ({struct.lattice.a:.3f} × {struct.lattice.b:.3f} × {struct.lattice.c:.3f} Å)", font=dict(size=14)),
             scene=dict(
@@ -196,11 +200,35 @@ st.markdown("Select a material to view its atomic structure.")
             height=550
         )
         st.plotly_chart(fig_3d, use_container_width=True)
-    
+        
         col_a, col_b, col_c = st.columns(3)
         col_a.metric("Lattice a", f"{struct.lattice.a:.3f} Å")
         col_b.metric("Lattice b", f"{struct.lattice.b:.3f} Å")
         col_c.metric("Lattice c", f"{struct.lattice.c:.3f} Å")
+    else:
+        st.info("No structure data available.")
+    
+    # --- Plots ---
+    st.subheader("📊 Band Gap vs. Density")
+    fig1 = px.scatter(df, x="Density (g/cm³)", y="Band Gap (eV)", color="Crystal System",
+                      hover_data=["Formula", "Material ID", "Stable"], 
+                      size="Volume (Å³)", opacity=0.7)
+    st.plotly_chart(fig1, use_container_width=True)
+    
+    st.subheader("📈 Band Gap Distribution")
+    fig2 = px.histogram(df, x="Band Gap (eV)", color="Crystal System", nbins=30, marginal="box")
+    st.plotly_chart(fig2, use_container_width=True)
+    
+    st.subheader("🎯 Stability Map")
+    fig3 = px.scatter(df, x="Band Gap (eV)", y="Energy Above Hull (eV/atom)",
+                      color="Stable", hover_data=["Formula"], log_y=True)
+    st.plotly_chart(fig3, use_container_width=True)
+    
+    csv = df.to_csv(index=False)
+    st.download_button("⬇️ Download CSV", csv, "materials_screening.csv", "text/csv")
+
+else:
+    st.info("Loading materials automatically... please wait.")
     else:
     st.info("No structure data available.")
     # Plot 1
