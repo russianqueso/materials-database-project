@@ -132,10 +132,10 @@ if "df" in st.session_state:
         selected = st.selectbox("Select material to visualize:", list(st.session_state.structures.keys()))
         struct = st.session_state.structures[selected]
 
-# ADD THIS BLOCK:
-from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-sga = SpacegroupAnalyzer(struct)
-struct = sga.get_conventional_standard_structure()
+        # ADD THIS BLOCK:
+        from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+        sga = SpacegroupAnalyzer(struct)
+        struct = sga.get_conventional_standard_structure()
         species = [str(site.specie) for site in struct]
         
         color_map = {
