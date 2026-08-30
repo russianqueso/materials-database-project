@@ -132,20 +132,8 @@ if "search_results" in st.session_state and st.session_state.search_results:
     # --- HEADER ---
     st.divider()
     
-    header_col1, header_col2, header_col3 = st.columns([2, 1, 1])
-    with header_col1:
-        st.header(d.formula_pretty)
-        st.caption(f"Material ID: `{d.material_id}`")
-    with header_col2:
-        if d.is_stable:
-            st.success("✅ Stable")
-        else:
-            st.error("❌ Unstable")
-    with header_col3:
-        if d.theoretical:
-            st.info("📐 Theoretical")
-        else:
-            st.info("🧪 Experimental")
+    st.header(d.formula_pretty)
+    st.caption(f"Material ID: `{d.material_id}`")
     
     # --- 3D STRUCTURE ---
     st.subheader("🧊 Crystal Structure")
@@ -291,14 +279,52 @@ if "search_results" in st.session_state and st.session_state.search_results:
         with r4c2:
             st.metric("Avg. Atomic Mass", f"{avg_mass:.2f} amu")
         
-        elem_cols = st.columns(len(elems))
+                elem_cols = st.columns(len(elems))
         for i, elem in enumerate(elems):
             el = Element(elem)
             with elem_cols[i]:
-                st.markdown(f"**{elem}**")
-                st.caption(f"Z = {el.Z}")
-                st.caption(f"Mass: {el.atomic_mass:.2f}")
-                st.caption(f"Radius: {el.atomic_radius} pm" if el.atomic_radius else "Radius: —")
+                st.markdown(f"**{elem}** — *{el.long_name}*")
+                
+                # Basic properties
+                st.caption(f"🔢 Z = {el.Z}")
+                st.caption(f"⚖️ Mass: {el.atomic_mass:.3f} amu")
+                
+                # Group & Period
+                group = el.group if hasattr(el, 'group') else "—"
+                period = el.row if hasattr(el, 'row') else "—"
+                st.caption(f"📊 Group {group}, Period {period}")
+                
+                # Electronegativity
+                en = el.electronegativity() if callable(el.electronegativity) else el.electronegativity
+                if en:
+                    st.caption(f"⚡ EN = {en:.2f} (Pauling)")
+                else:
+                    st.caption("⚡ EN = —")
+                
+                # Oxidation states
+                ox = el.common_oxidation_states if hasattr(el, 'common_oxidation_states') else []
+                if ox:
+                    ox_str = ", ".join([f"{o:+.0f}" if o != 0 else "0" for o in sorted(ox)])
+                    st.caption(f"🔋 Ox: {ox_str}")
+                else:
+                    st.caption("🔋 Ox: —")
+                
+                # Electron config
+                es = el.electronic_structure if hasattr(el, 'electronic_structure') else None
+                if es:
+                    st.caption(f"🌀 {es}")
+                else:
+                    st.caption("🌀 —")
+                
+                # Radii
+                r_cov = el.atomic_radius if hasattr(el, 'atomic_radius') else None
+                r_vdw = el.van_der_waals_radius if hasattr(el, 'van_der_waals_radius') else None
+                if r_cov:
+                    st.caption(f"📏 Radius: {r_cov} pm")
+                elif r_vdw:
+                    st.caption(f"📏 VdW: {r_vdw} pm")
+                else:
+                    st.caption("📏 Radius: —")
     
     with st.expander("📄 View Raw Data"):
         raw_data = {
