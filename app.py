@@ -13,7 +13,7 @@ st.markdown("Search or browse materials from the Materials Project database")
 # --- API Key ---
 api_key = st.secrets.get("MP_API_KEY", None)
 if not api_key:
-    st.error("⚠️ API key not configured. Add MP_API_KEY to Streamlit secrets.")
+    st.error(" API key not configured. Add MP_API_KEY to Streamlit secrets.")
     st.stop()
 
 # --- POPULAR MATERIALS DATABASE ---
@@ -55,9 +55,9 @@ with col2:
     search_button = st.button("Search", type="primary", use_container_width=True)
 
 # --- BROWSE POPULAR MATERIALS ---
-st.subheader("📚 Or Browse Popular Materials")
+st.subheader(" Or Browse Popular Materials")
 
-if st.button("🎲 Random Material", use_container_width=True):
+if st.button(" Random Material", use_container_width=True):
     _, random_formula = random.choice(POPULAR_MATERIALS)
     st.session_state.search_query_override = random_formula
     st.rerun()
@@ -256,7 +256,7 @@ if "search_results" in st.session_state and st.session_state.search_results:
         st.info("No structure data available for this material.")
     
     # --- PROPERTIES GRID ---
-    st.subheader("📊 Properties")
+    st.subheader(" Properties")
     
     r1c1, r1c2, r1c3, r1c4 = st.columns(4)
     with r1c1:
@@ -301,7 +301,7 @@ if "search_results" in st.session_state and st.session_state.search_results:
         st.metric("Space Group #", sg_num)
     
     # --- COMPOSITION & ELEMENTS ---
-    st.subheader("🧪 Composition")
+    st.subheader(" Composition")
     
     if d.elements:
         elems = sorted([str(e) for e in d.elements])
@@ -316,7 +316,7 @@ if "search_results" in st.session_state and st.session_state.search_results:
         # SINGLE ELEMENT: prominent isotope display
         if len(elems) == 1:
             elem = elems[0]
-            st.subheader(f"☢️ Isotopes of {elem}")
+            st.subheader(f" Isotopes of {elem}")
             
             try:
                 pt_elem = getattr(pt, elem, None)
@@ -348,7 +348,7 @@ if "search_results" in st.session_state and st.session_state.search_results:
             
             # Single element detail card (large)
             el = Element(elem)
-            st.subheader(f"📋 Properties of {elem}")
+            st.subheader(f" Properties of {elem}")
             
             ec1, ec2, ec3, ec4 = st.columns(4)
             with ec1:
@@ -381,12 +381,12 @@ if "search_results" in st.session_state and st.session_state.search_results:
                 with elem_cols[i]:
                     st.markdown(f"**{elem}** — *{el.long_name}*")
                     
-                    st.caption(f"🔢 Z = {el.Z}")
-                    st.caption(f"⚖️ Mass: {el.atomic_mass:.3f} amu")
+                    st.caption(f" Z = {el.Z}")
+                    st.caption(f" Mass: {el.atomic_mass:.3f} amu")
                     
                     group = el.group if hasattr(el, 'group') else "—"
                     period = el.row if hasattr(el, 'row') else "—"
-                    st.caption(f"📊 Group {group}, Period {period}")
+                    st.caption(f" Group {group}, Period {period}")
                     
                     en = getattr(el, 'X', None)
                     if en:
@@ -403,18 +403,18 @@ if "search_results" in st.session_state and st.session_state.search_results:
                     
                     es = el.electronic_structure if hasattr(el, 'electronic_structure') else None
                     if es:
-                        st.caption(f"🌀 {es}")
+                        st.caption(f" {es}")
                     else:
-                        st.caption("🌀 —")
+                        st.caption(" —")
                     
                     r_cov = el.atomic_radius if hasattr(el, 'atomic_radius') else None
                     r_vdw = el.van_der_waals_radius if hasattr(el, 'van_der_waals_radius') else None
                     if r_cov:
-                        st.caption(f"📏 Radius: {r_cov} pm")
+                        st.caption(f" Radius: {r_cov} pm")
                     elif r_vdw:
-                        st.caption(f"📏 VdW: {r_vdw} pm")
+                        st.caption(f" VdW: {r_vdw} pm")
                     else:
-                        st.caption("📏 Radius: —")
+                        st.caption(" Radius: —")
                     
                     # Small isotope captions for compounds
                     try:
@@ -424,37 +424,19 @@ if "search_results" in st.session_state and st.session_state.search_results:
                             isos.sort(key=lambda x: x[1], reverse=True)
                             if isos:
                                 iso_lines = [f"{elem}-{int(mass)} ({abund:.1f}%)" for mass, abund in isos[:3]]
-                                st.caption("☢️ " + ", ".join(iso_lines))
+                                st.caption(" " + ", ".join(iso_lines))
                             else:
-                                st.caption("☢️ No stable isotopes")
+                                st.caption(" No stable isotopes")
                         else:
-                            st.caption("☢️ —")
+                            st.caption("—")
                     except Exception:
-                        st.caption("☢️ —")
+                        st.caption(" —")
     
-    with st.expander("📄 View Raw Data"):
-        raw_data = {
-            "Material ID": d.material_id,
-            "Formula": d.formula_pretty,
-            "Band Gap (eV)": d.band_gap,
-            "Density (g/cm³)": d.density,
-            "Volume (Å³)": d.volume,
-            "Crystal System": str(d.symmetry.crystal_system) if d.symmetry else None,
-            "Space Group": d.symmetry.symbol if d.symmetry else None,
-            "Space Group #": d.symmetry.number if d.symmetry else None,
-            "Energy Above Hull (eV/atom)": d.energy_above_hull,
-            "Formation Energy (eV/atom)": d.formation_energy_per_atom,
-            "Is Stable": d.is_stable,
-            "Is Theoretical": d.theoretical,
-            "Number of Sites": d.nsites,
-            "Elements": d.elements,
-            "Deprecated": d.deprecated if hasattr(d, 'deprecated') else None
-        }
-        st.json(raw_data)
+    
 
 else:
     st.markdown("""
-    ### 👋 Welcome
+    ###  Welcome!
     
     Enter a chemical formula (e.g., `SiO2`, `Ba`, `LiFePO4`) or a Materials Project ID (e.g., `mp-149`) 
     in the search box above, click **Search**, or pick a material from the browse grid below.
