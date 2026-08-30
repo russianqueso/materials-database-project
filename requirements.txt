@@ -4,3 +4,4 @@ pandas
 mp-api
 spglib
 pymatgen
+periodictable
