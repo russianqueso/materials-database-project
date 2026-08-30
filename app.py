@@ -338,25 +338,7 @@ if "search_results" in st.session_state and st.session_state.search_results:
                         st.caption("☢️ —")
                 except Exception:
                     st.caption("☢️ —")
-    with st.expander("📄 View Raw Data"):
-        raw_data = {
-            "Material ID": d.material_id,
-            "Formula": d.formula_pretty,
-            "Band Gap (eV)": d.band_gap,
-            "Density (g/cm³)": d.density,
-            "Volume (Å³)": d.volume,
-            "Crystal System": str(d.symmetry.crystal_system) if d.symmetry else None,
-            "Space Group": d.symmetry.symbol if d.symmetry else None,
-            "Space Group #": d.symmetry.number if d.symmetry else None,
-            "Energy Above Hull (eV/atom)": d.energy_above_hull,
-            "Formation Energy (eV/atom)": d.formation_energy_per_atom,
-            "Is Stable": d.is_stable,
-            "Is Theoretical": d.theoretical,
-            "Number of Sites": d.nsites,
-            "Elements": d.elements,
-            "Deprecated": d.deprecated if hasattr(d, 'deprecated') else None
-        }
-        st.json(raw_data)
+    
 
 else:
     st.markdown("""
