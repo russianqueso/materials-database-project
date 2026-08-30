@@ -240,7 +240,9 @@ if "search_results" in st.session_state and st.session_state.search_results:
     with r1c3:
         st.metric("Volume", f"{d.volume:.2f} Å³")
     with r1c4:
-        st.metric("Atoms / Cell", d.nsites)
+        # Use the structure length after conventional cell conversion
+        atom_count = len(struct) if d.structure else d.nsites
+        st.metric("Atoms / Cell", atom_count)
     
     st.markdown("**Thermodynamic Properties**")
     r2c1, r2c2 = st.columns(2)
@@ -276,6 +278,7 @@ if "search_results" in st.session_state and st.session_state.search_results:
             st.metric("Avg. Atomic Mass", f"{avg_mass:.2f} amu")
         
         # Element detail cards
+        
         elem_cols = st.columns(len(elems))
         for i, elem in enumerate(elems):
             el = Element(elem)
@@ -289,7 +292,8 @@ if "search_results" in st.session_state and st.session_state.search_results:
                 period = el.row if hasattr(el, 'row') else "—"
                 st.caption(f"📊 Group {group}, Period {period}")
                 
-                en = el.electronegativity() if callable(el.electronegativity) else el.electronegativity
+                # FIXED: Use el.X for Pauling electronegativity
+                en = getattr(el, 'X', None)
                 if en:
                     st.caption(f"⚡ EN = {en:.2f}")
                 else:
@@ -317,7 +321,7 @@ if "search_results" in st.session_state and st.session_state.search_results:
                 else:
                     st.caption("📏 Radius: —")
                 
-                # ISOTOPES (new)
+                # ISOTOPES
                 try:
                     pt_elem = getattr(pt, elem, None)
                     if pt_elem:
@@ -334,7 +338,6 @@ if "search_results" in st.session_state and st.session_state.search_results:
                         st.caption("☢️ —")
                 except Exception:
                     st.caption("☢️ —")
-    
     with st.expander("📄 View Raw Data"):
         raw_data = {
             "Material ID": d.material_id,
