@@ -279,7 +279,7 @@ if "search_results" in st.session_state and st.session_state.search_results:
         with r4c2:
             st.metric("Avg. Atomic Mass", f"{avg_mass:.2f} amu")
         
-                elem_cols = st.columns(len(elems))
+        elem_cols = st.columns(len(elems))
         for i, elem in enumerate(elems):
             el = Element(elem)
             with elem_cols[i]:
