@@ -132,21 +132,32 @@ if "search_results" in st.session_state and st.session_state.search_results:
     st.header(d.formula_pretty)
     st.caption(f"Material ID: `{d.material_id}`")
     
-    # --- 3D STRUCTURE ---
+    # --- 3D STRUCTURE (Textbook Style) ---
     st.subheader("🧊 Crystal Structure")
     
     if d.structure:
         struct = d.structure
         
+        # Convert to conventional cell
         try:
             sga = SpacegroupAnalyzer(struct)
             struct = sga.get_conventional_standard_structure()
         except Exception:
             pass
         
-        coords = struct.cart_coords
-        species = [str(site.specie) for site in struct]
+        # For visualization: create 3x3x3 supercell to show textbook-style spheres
+        # For large structures, just show conventional cell
+        if len(struct) <= 20:
+            viz_struct = struct * [3, 3, 3]
+            draw_central_cell = True
+        else:
+            viz_struct = struct
+            draw_central_cell = False
         
+        coords = viz_struct.cart_coords
+        species = [str(site.specie) for site in viz_struct]
+        
+        # CPK colors
         color_map = {
             "H": "#FFFFFF", "He": "#D9FFFF", "Li": "#CC80FF", "Be": "#C2FF00",
             "B": "#FFB5B5", "C": "#909090", "N": "#3050F8", "O": "#FF0D0D",
@@ -186,16 +197,39 @@ if "search_results" in st.session_state and st.session_state.search_results:
             hovertemplate='<b>%{text}</b><br>x: %{x:.3f} Å<br>y: %{y:.3f} Å<br>z: %{z:.3f} Å<extra></extra>'
         )])
         
-        lattice = struct.lattice
-        corners = [[0,0,0], [1,0,0], [1,1,0], [0,1,0], [0,0,1], [1,0,1], [1,1,1], [0,1,1]]
-        corner_coords = [lattice.get_cartesian_coords(c) for c in corners]
+        # Draw the central cell box (RED, thick)
+        if draw_central_cell:
+            lattice = struct.lattice
+            corners = [
+                lattice.get_cartesian_coords([1, 1, 1]),
+                lattice.get_cartesian_coords([2, 1, 1]),
+                lattice.get_cartesian_coords([2, 2, 1]),
+                lattice.get_cartesian_coords([1, 2, 1]),
+                lattice.get_cartesian_coords([1, 1, 2]),
+                lattice.get_cartesian_coords([2, 1, 2]),
+                lattice.get_cartesian_coords([2, 2, 2]),
+                lattice.get_cartesian_coords([1, 2, 2]),
+            ]
+        else:
+            lattice = struct.lattice
+            corners = [
+                lattice.get_cartesian_coords([0, 0, 0]),
+                lattice.get_cartesian_coords([1, 0, 0]),
+                lattice.get_cartesian_coords([1, 1, 0]),
+                lattice.get_cartesian_coords([0, 1, 0]),
+                lattice.get_cartesian_coords([0, 0, 1]),
+                lattice.get_cartesian_coords([1, 0, 1]),
+                lattice.get_cartesian_coords([1, 1, 1]),
+                lattice.get_cartesian_coords([0, 1, 1]),
+            ]
+        
         edges = [(0,1), (1,2), (2,3), (3,0), (4,5), (5,6), (6,7), (7,4), (0,4), (1,5), (2,6), (3,7)]
         for edge in edges:
-            x = [corner_coords[edge[0]][0], corner_coords[edge[1]][0]]
-            y = [corner_coords[edge[0]][1], corner_coords[edge[1]][1]]
-            z = [corner_coords[edge[0]][2], corner_coords[edge[1]][2]]
+            x = [corners[edge[0]][0], corners[edge[1]][0]]
+            y = [corners[edge[0]][1], corners[edge[1]][1]]
+            z = [corners[edge[0]][2], corners[edge[1]][2]]
             fig_3d.add_trace(go.Scatter3d(x=x, y=y, z=z, mode='lines',
-                line=dict(color='gray', width=2), hoverinfo='skip', showlegend=False))
+                line=dict(color='red', width=3), hoverinfo='skip', showlegend=False))
         
         fig_3d.update_layout(
             scene=dict(
@@ -210,6 +244,7 @@ if "search_results" in st.session_state and st.session_state.search_results:
         )
         st.plotly_chart(fig_3d, use_container_width=True)
         
+        # Lattice constants
         lc1, lc2, lc3, lc4, lc5, lc6 = st.columns(6)
         lc1.metric("a", f"{struct.lattice.a:.3f} Å")
         lc2.metric("b", f"{struct.lattice.b:.3f} Å")
@@ -240,7 +275,7 @@ if "search_results" in st.session_state and st.session_state.search_results:
     with r1c3:
         st.metric("Volume", f"{d.volume:.2f} Å³")
     with r1c4:
-        # Use the structure length after conventional cell conversion
+        # Use len(struct) for actual conventional cell atom count
         atom_count = len(struct) if d.structure else d.nsites
         st.metric("Atoms / Cell", atom_count)
     
@@ -252,7 +287,6 @@ if "search_results" in st.session_state and st.session_state.search_results:
     with r2c2:
         form = d.formation_energy_per_atom if d.formation_energy_per_atom is not None else 0
         st.metric("Formation Energy", f"{form:.3f} eV/atom")
-    # NOTE: Stability metric removed per user request
     
     st.markdown("**Crystal Structure**")
     r3c1, r3c2, r3c3 = st.columns(3)
@@ -266,7 +300,9 @@ if "search_results" in st.session_state and st.session_state.search_results:
         sg_num = d.symmetry.number if d.symmetry else "—"
         st.metric("Space Group #", sg_num)
     
-    st.markdown("**Composition**")
+    # --- COMPOSITION & ELEMENTS ---
+    st.subheader("🧪 Composition")
+    
     if d.elements:
         elems = sorted([str(e) for e in d.elements])
         avg_mass = sum(Element(e).atomic_mass for e in elems) / len(elems)
@@ -277,68 +313,144 @@ if "search_results" in st.session_state and st.session_state.search_results:
         with r4c2:
             st.metric("Avg. Atomic Mass", f"{avg_mass:.2f} amu")
         
-        # Element detail cards
-        
-        elem_cols = st.columns(len(elems))
-        for i, elem in enumerate(elems):
+        # SINGLE ELEMENT: prominent isotope display
+        if len(elems) == 1:
+            elem = elems[0]
+            st.subheader(f"☢️ Isotopes of {elem}")
+            
+            try:
+                pt_elem = getattr(pt, elem, None)
+                if pt_elem:
+                    isos = [(iso.mass, iso.abundance) for iso in pt_elem if iso.abundance and iso.abundance > 0]
+                    isos.sort(key=lambda x: x[1], reverse=True)
+                    
+                    if isos:
+                        iso_data = []
+                        for mass, abund in isos:
+                            iso_data.append({
+                                "Isotope": f"{elem}-{int(mass)}",
+                                "Mass (amu)": round(mass, 4),
+                                "Natural Abundance (%)": round(abund, 2)
+                            })
+                        
+                        import pandas as pd
+                        iso_df = pd.DataFrame(iso_data)
+                        st.dataframe(iso_df, use_container_width=True, hide_index=True)
+                        
+                        most_abundant = iso_data[0]
+                        st.info(f"Most abundant natural isotope: **{most_abundant['Isotope']}** ({most_abundant['Natural Abundance (%)']}%)")
+                    else:
+                        st.info("No stable isotopes known for this element.")
+                else:
+                    st.info("Isotope data not available.")
+            except Exception:
+                st.info("Isotope data not available.")
+            
+            # Single element detail card (large)
             el = Element(elem)
-            with elem_cols[i]:
-                st.markdown(f"**{elem}** — *{el.long_name}*")
-                
-                st.caption(f"🔢 Z = {el.Z}")
-                st.caption(f"⚖️ Mass: {el.atomic_mass:.3f} amu")
-                
+            st.subheader(f"📋 Properties of {elem}")
+            
+            ec1, ec2, ec3, ec4 = st.columns(4)
+            with ec1:
+                st.metric("Atomic Number", el.Z)
+                st.metric("Atomic Mass", f"{el.atomic_mass:.3f} amu")
+            with ec2:
                 group = el.group if hasattr(el, 'group') else "—"
                 period = el.row if hasattr(el, 'row') else "—"
-                st.caption(f"📊 Group {group}, Period {period}")
-                
-                # FIXED: Use el.X for Pauling electronegativity
+                st.metric("Group", group)
+                st.metric("Period", period)
+            with ec3:
                 en = getattr(el, 'X', None)
-                if en:
-                    st.caption(f"⚡ EN = {en:.2f}")
-                else:
-                    st.caption("⚡ EN = —")
-                
+                st.metric("Electronegativity", f"{en:.2f}" if en else "—")
                 ox = el.common_oxidation_states if hasattr(el, 'common_oxidation_states') else []
-                if ox:
-                    ox_str = ", ".join([f"{o:+.0f}" if o != 0 else "0" for o in sorted(ox)])
-                    st.caption(f"🔋 Ox: {ox_str}")
-                else:
-                    st.caption("🔋 Ox: —")
-                
-                es = el.electronic_structure if hasattr(el, 'electronic_structure') else None
-                if es:
-                    st.caption(f"🌀 {es}")
-                else:
-                    st.caption("🌀 —")
-                
+                ox_str = ", ".join([f"{o:+.0f}" if o != 0 else "0" for o in sorted(ox)]) if ox else "—"
+                st.metric("Oxidation States", ox_str)
+            with ec4:
                 r_cov = el.atomic_radius if hasattr(el, 'atomic_radius') else None
                 r_vdw = el.van_der_waals_radius if hasattr(el, 'van_der_waals_radius') else None
-                if r_cov:
-                    st.caption(f"📏 Radius: {r_cov} pm")
-                elif r_vdw:
-                    st.caption(f"📏 VdW: {r_vdw} pm")
-                else:
-                    st.caption("📏 Radius: —")
-                
-                # ISOTOPES
-                try:
-                    pt_elem = getattr(pt, elem, None)
-                    if pt_elem:
-                        isos = [(iso.mass, iso.abundance) for iso in pt_elem if iso.abundance and iso.abundance > 0]
-                        isos.sort(key=lambda x: x[1], reverse=True)
-                        if isos:
-                            iso_lines = [f"**{elem}-{int(mass)}** ({abund:.2f}%)" for mass, abund in isos[:4]]
-                            st.caption("☢️ Isotopes:")
-                            for line in iso_lines:
-                                st.caption(line)
-                        else:
-                            st.caption("☢️ No stable isotopes")
+                radius = r_cov if r_cov else (r_vdw if r_vdw else None)
+                st.metric("Atomic Radius", f"{radius} pm" if radius else "—")
+                es = el.electronic_structure if hasattr(el, 'electronic_structure') else None
+                st.metric("Electron Config", es if es else "—")
+        
+        # COMPOUND: element cards with small isotope captions
+        else:
+            elem_cols = st.columns(len(elems))
+            for i, elem in enumerate(elems):
+                el = Element(elem)
+                with elem_cols[i]:
+                    st.markdown(f"**{elem}** — *{el.long_name}*")
+                    
+                    st.caption(f"🔢 Z = {el.Z}")
+                    st.caption(f"⚖️ Mass: {el.atomic_mass:.3f} amu")
+                    
+                    group = el.group if hasattr(el, 'group') else "—"
+                    period = el.row if hasattr(el, 'row') else "—"
+                    st.caption(f"📊 Group {group}, Period {period}")
+                    
+                    en = getattr(el, 'X', None)
+                    if en:
+                        st.caption(f"⚡ EN = {en:.2f}")
                     else:
+                        st.caption("⚡ EN = —")
+                    
+                    ox = el.common_oxidation_states if hasattr(el, 'common_oxidation_states') else []
+                    if ox:
+                        ox_str = ", ".join([f"{o:+.0f}" if o != 0 else "0" for o in sorted(ox)])
+                        st.caption(f"🔋 Ox: {ox_str}")
+                    else:
+                        st.caption("🔋 Ox: —")
+                    
+                    es = el.electronic_structure if hasattr(el, 'electronic_structure') else None
+                    if es:
+                        st.caption(f"🌀 {es}")
+                    else:
+                        st.caption("🌀 —")
+                    
+                    r_cov = el.atomic_radius if hasattr(el, 'atomic_radius') else None
+                    r_vdw = el.van_der_waals_radius if hasattr(el, 'van_der_waals_radius') else None
+                    if r_cov:
+                        st.caption(f"📏 Radius: {r_cov} pm")
+                    elif r_vdw:
+                        st.caption(f"📏 VdW: {r_vdw} pm")
+                    else:
+                        st.caption("📏 Radius: —")
+                    
+                    # Small isotope captions for compounds
+                    try:
+                        pt_elem = getattr(pt, elem, None)
+                        if pt_elem:
+                            isos = [(iso.mass, iso.abundance) for iso in pt_elem if iso.abundance and iso.abundance > 0]
+                            isos.sort(key=lambda x: x[1], reverse=True)
+                            if isos:
+                                iso_lines = [f"{elem}-{int(mass)} ({abund:.1f}%)" for mass, abund in isos[:3]]
+                                st.caption("☢️ " + ", ".join(iso_lines))
+                            else:
+                                st.caption("☢️ No stable isotopes")
+                        else:
+                            st.caption("☢️ —")
+                    except Exception:
                         st.caption("☢️ —")
-                except Exception:
-                    st.caption("☢️ —")
     
+    with st.expander("📄 View Raw Data"):
+        raw_data = {
+            "Material ID": d.material_id,
+            "Formula": d.formula_pretty,
+            "Band Gap (eV)": d.band_gap,
+            "Density (g/cm³)": d.density,
+            "Volume (Å³)": d.volume,
+            "Crystal System": str(d.symmetry.crystal_system) if d.symmetry else None,
+            "Space Group": d.symmetry.symbol if d.symmetry else None,
+            "Space Group #": d.symmetry.number if d.symmetry else None,
+            "Energy Above Hull (eV/atom)": d.energy_above_hull,
+            "Formation Energy (eV/atom)": d.formation_energy_per_atom,
+            "Is Stable": d.is_stable,
+            "Is Theoretical": d.theoretical,
+            "Number of Sites": d.nsites,
+            "Elements": d.elements,
+            "Deprecated": d.deprecated if hasattr(d, 'deprecated') else None
+        }
+        st.json(raw_data)
 
 else:
     st.markdown("""
