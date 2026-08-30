@@ -1,144 +1,118 @@
 import streamlit as st
-import plotly.express as px
-from mp_api.client import MPRester
-import pandas as pd
 import plotly.graph_objects as go
+from mp_api.client import MPRester
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+from pymatgen.core import Element
+import pandas as pd
 
 st.set_page_config(page_title="Materials Explorer", layout="wide")
-st.title("Materials Science Dashboard")
-st.markdown("Screen real materials from the Materials Project database")
+st.title("🔬 Materials Science Dashboard")
+st.markdown("Search any material from the Materials Project database")
 
-# --- Sidebar ---
+# --- API Key ---
 api_key = st.secrets.get("MP_API_KEY", None)
-
 if not api_key:
-    st.error("API key not configured. Add MP_API_KEY to Streamlit secrets.")
+    st.error("⚠️ API key not configured. Add MP_API_KEY to Streamlit secrets.")
     st.stop()
 
-# Presets
-st.sidebar.subheader("Quick Presets")
-is_metal = st.sidebar.checkbox("Only metals (zero band gap)", value=False)
-preset = st.sidebar.selectbox("Load a preset", [
-    "None (custom)", 
-    "Battery Materials (Li-containing, stable)",
-    "Solar Cell Absorbers (1-2 eV gap, stable)",
-    "Magnets / Metals (zero gap)",
-    "Oxides Only (O-containing, stable)"
-])
+# --- Central Search ---
+st.subheader("🔎 Search for a Material")
+col1, col2 = st.columns([3, 1])
+with col1:
+    search_query = st.text_input("Enter chemical formula or material ID (e.g., SiO2, Ba, mp-149)", 
+                                  placeholder="e.g., SiO2, LiFePO4, Ba")
+with col2:
+    search_button = st.button("Search", type="primary", use_container_width=True)
 
-max_elements = st.sidebar.slider("Max elements", 1, 5, 3)
-min_gap = st.sidebar.slider("Min band gap (eV)", 0.0, 10.0, 0.0)
-max_gap = st.sidebar.slider("Max band gap (eV)", 0.0, 10.0, 10.0)
-elements = st.sidebar.text_input("Must contain elements (e.g., Li, O, Fe)", placeholder="Li,O")
-only_stable = st.sidebar.checkbox("Only stable materials", value=False)
-chunk_size = st.sidebar.slider("Max results", 100, 2000, 500)
-
-# Apply presets
-if preset == "Battery Materials (Li-containing, stable)":
-    elements = "Li"
-    only_stable = True
-    min_gap, max_gap = 0.0, 5.0
-elif preset == "Solar Cell Absorbers (1-2 eV gap, stable)":
-    min_gap, max_gap = 1.0, 2.0
-    only_stable = True
-elif preset == "Magnets / Metals (zero gap)":
-    min_gap, max_gap = 0.0, 0.1
-elif preset == "Oxides Only (O-containing, stable)":
-    elements = "O"
-    only_stable = True
-
-if is_metal:
-    min_gap, max_gap = 0.0, 0.1
-
-load_button = st.sidebar.button("Load Materials", type="primary")
-auto_load = "df" not in st.session_state
-
-# --- Fetch Data ---
-if load_button or auto_load:
-    with st.spinner("Fetching data..."):
+# --- Fetch Results ---
+if search_button and search_query.strip():
+    with st.spinner("Searching..."):
         try:
             with MPRester(api_key) as mpr:
-                query = {
-                    "num_elements": (1, max_elements),
-                    "band_gap": (min_gap, max_gap),
-                    "fields": ["material_id", "formula_pretty", "band_gap",
-                               "density", "volume", "structure", "symmetry", 
-                               "energy_above_hull", "is_stable", "elements"],
-                    "num_chunks": 1,
-                    "chunk_size": chunk_size
-                }
+                q = search_query.strip()
                 
-                if only_stable:
-                    query["energy_above_hull"] = (0, 0.05)
+                # If it looks like a material ID (starts with mp-)
+                if q.startswith("mp-"):
+                    docs = mpr.materials.summary.search(
+                        material_ids=[q],
+                        fields=["material_id", "formula_pretty", "band_gap", "density", 
+                                "volume", "symmetry", "energy_above_hull", "is_stable",
+                                "formation_energy_per_atom", "nsites", "structure", 
+                                "elements", "theoretical", "deprecated"]
+                    )
+                else:
+                    # Search by formula
+                    docs = mpr.materials.summary.search(
+                        formula=q,
+                        fields=["material_id", "formula_pretty", "band_gap", "density", 
+                                "volume", "symmetry", "energy_above_hull", "is_stable",
+                                "formation_energy_per_atom", "nsites", "structure", 
+                                "elements", "theoretical", "deprecated"]
+                    )
                 
-                if elements.strip():
-                    query["elements"] = [e.strip() for e in elements.split(",") if e.strip()]
+                if len(docs) == 0:
+                    st.warning("No materials found. Try a different formula or material ID.")
+                    st.stop()
                 
-                docs = mpr.materials.summary.search(**query)
-            
-            if len(docs) == 0:
-                st.warning("No materials match those filters.")
-                st.stop()
-            
-            structures = {}
-            data = []
-            
-            for d in docs:
-                data.append({
-                    "Material ID": d.material_id,
-                    "Formula": d.formula_pretty,
-                    "Band Gap (eV)": round(d.band_gap, 3) if d.band_gap is not None else 0,
-                    "Density (g/cm³)": round(d.density, 3) if d.density is not None else 0,
-                    "Volume (Å³)": round(d.volume, 2) if d.volume is not None else 0,
-                    "Crystal System": str(d.symmetry.crystal_system) if d.symmetry else "Unknown",
-                    "Energy Above Hull (eV/atom)": round(d.energy_above_hull, 4) if d.energy_above_hull is not None else 0,
-                    "Stable": "Yes" if d.is_stable else "No"
-                })
-                if d.structure:
-                    structures[d.formula_pretty] = d.structure
-            
-            df = pd.DataFrame(data)
-            st.session_state.df = df
-            st.session_state.structures = structures
-            st.success(f"Loaded {len(df)} materials!")
-            
+                st.session_state.search_results = docs
+                st.session_state.selected_index = 0
+                st.success(f"Found {len(docs)} result(s)")
+                
         except Exception as e:
             st.error(f"API Error: {e}")
             st.stop()
 
-# --- Display ---
-if "df" in st.session_state:
-    df = st.session_state.df
+# --- Display Selected Material ---
+if "search_results" in st.session_state and st.session_state.search_results:
+    docs = st.session_state.search_results
     
-    # Summary stats
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total", len(df))
-    c2.metric("Stable", (df["Stable"] == "✅ Yes").sum())
-    c3.metric("Avg Gap", f"{df['Band Gap (eV)'].mean():.2f} eV")
-    c4.metric("Unique Structures", df["Crystal System"].nunique())
+    # If multiple results, let user pick one
+    if len(docs) > 1:
+        options = [f"{d.formula_pretty} ({d.material_id})" for d in docs]
+        selected = st.selectbox("Multiple matches found — select one:", options, 
+                                 index=st.session_state.selected_index)
+        idx = options.index(selected)
+        st.session_state.selected_index = idx
+    else:
+        idx = 0
     
-    # Table
-    st.subheader("📋 Materials Table")
-    sort_by = st.selectbox("Sort by", ["Energy Above Hull (eV/atom)", "Band Gap (eV)", 
-                                         "Density (g/cm³)", "Volume (Å³)"])
-    ascending = st.checkbox("Ascending", value=True)
-    st.dataframe(df.sort_values(sort_by, ascending=ascending), use_container_width=True, height=400)
+    d = docs[idx]
     
-    # --- 3D CRYSTAL STRUCTURE VIEWER ---
-    st.subheader("3D Crystal Structure Viewer")
-    st.markdown("Select a material from the table above to view its atomic structure.")
+    # --- HEADER ---
+    st.divider()
     
-    if "structures" in st.session_state and len(st.session_state.structures) > 0:
-        selected = st.selectbox("Select material to visualize:", list(st.session_state.structures.keys()))
-        struct = st.session_state.structures[selected]
-
-        # ADD THIS BLOCK:
-        from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-        sga = SpacegroupAnalyzer(struct)
-        struct = sga.get_conventional_standard_structure()
+    header_col1, header_col2, header_col3 = st.columns([2, 1, 1])
+    with header_col1:
+        st.header(d.formula_pretty)
+        st.caption(f"Material ID: `{d.material_id}`")
+    with header_col2:
+        if d.is_stable:
+            st.success("✅ Stable")
+        else:
+            st.error("❌ Unstable")
+    with header_col3:
+        if d.theoretical:
+            st.info("📐 Theoretical")
+        else:
+            st.info("🧪 Experimental")
+    
+    # --- 3D STRUCTURE (Prominent) ---
+    st.subheader("🧊 Crystal Structure")
+    
+    if d.structure:
+        struct = d.structure
+        
+        # Convert to conventional cell
+        try:
+            sga = SpacegroupAnalyzer(struct)
+            struct = sga.get_conventional_standard_structure()
+        except Exception:
+            pass
+        
         coords = struct.cart_coords
         species = [str(site.specie) for site in struct]
         
+        # CPK colors
         color_map = {
             "H": "#FFFFFF", "He": "#D9FFFF", "Li": "#CC80FF", "Be": "#C2FF00",
             "B": "#FFB5B5", "C": "#909090", "N": "#3050F8", "O": "#FF0D0D",
@@ -178,6 +152,7 @@ if "df" in st.session_state:
             hovertemplate='<b>%{text}</b><br>x: %{x:.3f} Å<br>y: %{y:.3f} Å<br>z: %{z:.3f} Å<extra></extra>'
         )])
         
+        # Lattice box
         lattice = struct.lattice
         corners = [[0,0,0], [1,0,0], [1,1,0], [0,1,0], [0,0,1], [1,0,1], [1,1,1], [0,1,1]]
         corner_coords = [lattice.get_cartesian_coords(c) for c in corners]
@@ -190,57 +165,124 @@ if "df" in st.session_state:
                 line=dict(color='gray', width=2), hoverinfo='skip', showlegend=False))
         
         fig_3d.update_layout(
-            title=dict(text=f"Crystal Structure: {selected}  ({struct.lattice.a:.3f} × {struct.lattice.b:.3f} × {struct.lattice.c:.3f} Å)", font=dict(size=14)),
             scene=dict(
-                xaxis=dict(title="x (Å)", showbackground=True, backgroundcolor="rgb(245,245,245)", showgrid=True, zeroline=False),
-                yaxis=dict(title="y (Å)", showbackground=True, backgroundcolor="rgb(245,245,245)", showgrid=True, zeroline=False),
-                zaxis=dict(title="z (Å)", showbackground=True, backgroundcolor="rgb(245,245,245)", showgrid=True, zeroline=False),
+                xaxis=dict(title="x (Å)", showbackground=True, backgroundcolor="rgb(245,245,245)", showgrid=True),
+                yaxis=dict(title="y (Å)", showbackground=True, backgroundcolor="rgb(245,245,245)", showgrid=True),
+                zaxis=dict(title="z (Å)", showbackground=True, backgroundcolor="rgb(245,245,245)", showgrid=True),
                 aspectmode='data',
                 camera=dict(eye=dict(x=1.5, y=1.5, z=1.2))
             ),
-            margin=dict(l=0, r=0, b=0, t=40),
-            height=550
+            margin=dict(l=0, r=0, b=0, t=10),
+            height=500
         )
         st.plotly_chart(fig_3d, use_container_width=True)
         
-        col_a, col_b, col_c = st.columns(3)
-        col_a.metric("Lattice a", f"{struct.lattice.a:.3f} Å")
-        col_b.metric("Lattice b", f"{struct.lattice.b:.3f} Å")
-        col_c.metric("Lattice c", f"{struct.lattice.c:.3f} Å")
+        # Lattice constants
+        lc1, lc2, lc3, lc4, lc5, lc6 = st.columns(6)
+        lc1.metric("a", f"{struct.lattice.a:.3f} Å")
+        lc2.metric("b", f"{struct.lattice.b:.3f} Å")
+        lc3.metric("c", f"{struct.lattice.c:.3f} Å")
+        lc4.metric("α", f"{struct.lattice.alpha:.1f}°")
+        lc5.metric("β", f"{struct.lattice.beta:.1f}°")
+        lc6.metric("γ", f"{struct.lattice.gamma:.1f}°")
     else:
-        st.info("No structure data available.")
+        st.info("No structure data available for this material.")
     
-    # --- Plots ---
-    st.subheader("Band Gap vs. Density")
-    fig1 = px.scatter(df, x="Density (g/cm³)", y="Band Gap (eV)", color="Crystal System",
-                      hover_data=["Formula", "Material ID", "Stable"], 
-                      size="Volume (Å³)", opacity=0.7)
-    st.plotly_chart(fig1, use_container_width=True)
+    # --- PROPERTIES GRID ---
+    st.subheader("📊 Properties")
     
-    st.subheader("Band Gap Distribution")
-    fig2 = px.histogram(df, x="Band Gap (eV)", color="Crystal System", nbins=30, marginal="box")
-    st.plotly_chart(fig2, use_container_width=True)
+    # Row 1: Electronic & Basic
+    r1c1, r1c2, r1c3, r1c4 = st.columns(4)
+    with r1c1:
+        gap = d.band_gap if d.band_gap is not None else 0
+        st.metric("Band Gap", f"{gap:.3f} eV")
+        if gap == 0:
+            st.caption("Metal / Conductor")
+        elif gap < 1:
+            st.caption("Narrow-gap Semiconductor")
+        elif gap < 3:
+            st.caption("Semiconductor")
+        else:
+            st.caption("Insulator / Wide-gap")
+    with r1c2:
+        st.metric("Density", f"{d.density:.3f} g/cm³")
+    with r1c3:
+        st.metric("Volume", f"{d.volume:.2f} Å³")
+    with r1c4:
+        st.metric("Atoms / Cell", d.nsites)
     
-    st.subheader("Stability Map")
-    fig3 = px.scatter(df, x="Band Gap (eV)", y="Energy Above Hull (eV/atom)",
-                      color="Stable", hover_data=["Formula"], log_y=True)
-    st.plotly_chart(fig3, use_container_width=True)
+    # Row 2: Thermodynamic
+    st.markdown("**Thermodynamic Properties**")
+    r2c1, r2c2, r2c3 = st.columns(3)
+    with r2c1:
+        hull = d.energy_above_hull if d.energy_above_hull is not None else 0
+        st.metric("Energy Above Hull", f"{hull:.4f} eV/atom")
+    with r2c2:
+        form = d.formation_energy_per_atom if d.formation_energy_per_atom is not None else 0
+        st.metric("Formation Energy", f"{form:.3f} eV/atom")
+    with r2c3:
+        st.metric("Stability", "Stable" if d.is_stable else "Unstable")
     
-    csv = df.to_csv(index=False)
-    st.download_button("Download CSV", csv, "materials_screening.csv", "text/csv")
+    # Row 3: Crystal & Symmetry
+    st.markdown("**Crystal Structure**")
+    r3c1, r3c2, r3c3 = st.columns(3)
+    with r3c1:
+        cs = str(d.symmetry.crystal_system) if d.symmetry else "Unknown"
+        st.metric("Crystal System", cs)
+    with r3c2:
+        sg = d.symmetry.symbol if d.symmetry else "Unknown"
+        st.metric("Space Group", sg)
+    with r3c3:
+        sg_num = d.symmetry.number if d.symmetry else "—"
+        st.metric("Space Group #", sg_num)
     
+    # Row 4: Composition
+    st.markdown("**Composition**")
+    if d.elements:
+        elems = sorted(d.elements)
+        avg_mass = sum(Element(e).atomic_mass for e in elems) / len(elems)
+        
+        r4c1, r4c2 = st.columns(2)
+        with r4c1:
+            st.metric("Elements", ", ".join(elems))
+        with r4c2:
+            st.metric("Avg. Atomic Mass", f"{avg_mass:.2f} amu")
+        
+        # Element detail cards
+        elem_cols = st.columns(len(elems))
+        for i, elem in enumerate(elems):
+            el = Element(elem)
+            with elem_cols[i]:
+                st.markdown(f"**{elem}**")
+                st.caption(f"Z = {el.Z}")
+                st.caption(f"Mass: {el.atomic_mass:.2f}")
+                st.caption(f"Radius: {el.atomic_radius} pm" if el.atomic_radius else "Radius: —")
+    
+    # Raw data expander
+    with st.expander("📄 View Raw Data"):
+        raw_data = {
+            "Material ID": d.material_id,
+            "Formula": d.formula_pretty,
+            "Band Gap (eV)": d.band_gap,
+            "Density (g/cm³)": d.density,
+            "Volume (Å³)": d.volume,
+            "Crystal System": str(d.symmetry.crystal_system) if d.symmetry else None,
+            "Space Group": d.symmetry.symbol if d.symmetry else None,
+            "Space Group #": d.symmetry.number if d.symmetry else None,
+            "Energy Above Hull (eV/atom)": d.energy_above_hull,
+            "Formation Energy (eV/atom)": d.formation_energy_per_atom,
+            "Is Stable": d.is_stable,
+            "Is Theoretical": d.theoretical,
+            "Number of Sites": d.nsites,
+            "Elements": d.elements,
+            "Deprecated": d.deprecated if hasattr(d, 'deprecated') else None
+        }
+        st.json(raw_data)
+
 else:
     st.markdown("""
-    ### Welcome to the Materials Explorer!
+    ### 👋 Welcome
     
-    **What this tool does:** It queries the real Materials Project database and lets you filter by properties that matter for real applications.
-    
-    **How to use it:**
-    1. Pick a **preset** (battery materials, solar cells, etc.) or set custom filters
-    2. Click **Load Materials**
-    
-    **Key concepts:**
-    - **Band Gap** → 0 = metal, 0.1–3 = semiconductor, >3 = insulator
-    - **Energy Above Hull** → 0 = perfectly stable, >0.1 = probably can't be synthesized
-    - **Crystal System** → how atoms pack (cubic = metals, hexagonal = ceramics, etc.)
+    Enter a chemical formula (e.g., `SiO2`, `Ba`, `LiFePO4`) or a Materials Project ID (e.g., `mp-149`) 
+    in the search box above and click **Search** to see all properties for that material.
     """)
