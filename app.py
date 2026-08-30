@@ -3,11 +3,11 @@ import plotly.graph_objects as go
 from mp_api.client import MPRester
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.core import Element
-import pandas as pd
+import random
 
 st.set_page_config(page_title="Materials Explorer", layout="wide")
 st.title("🔬 Materials Science Dashboard")
-st.markdown("Search any material from the Materials Project database")
+st.markdown("Search or browse materials from the Materials Project database")
 
 # --- API Key ---
 api_key = st.secrets.get("MP_API_KEY", None)
@@ -15,23 +15,76 @@ if not api_key:
     st.error("⚠️ API key not configured. Add MP_API_KEY to Streamlit secrets.")
     st.stop()
 
+# --- POPULAR MATERIALS DATABASE ---
+POPULAR_MATERIALS = [
+    ("Silicon", "Si"),
+    ("Gallium Arsenide", "GaAs"),
+    ("Lithium Iron Phosphate", "LiFePO4"),
+    ("Molybdenum Disulfide", "MoS2"),
+    ("Barium Titanate", "BaTiO3"),
+    ("Copper", "Cu"),
+    ("Aluminum Oxide", "Al2O3"),
+    ("Titanium Dioxide", "TiO2"),
+    ("Zinc Oxide", "ZnO"),
+    ("Sodium Chloride", "NaCl"),
+    ("Diamond", "C"),
+    ("Iron", "Fe"),
+    ("Gold", "Au"),
+    ("Magnesium Oxide", "MgO"),
+    ("Cesium Chloride", "CsCl"),
+    ("Lithium Cobalt Oxide", "LiCoO2"),
+    ("Calcium Carbonate", "CaCO3"),
+    ("Quartz", "SiO2"),
+    ("Yttrium Barium Copper Oxide", "YBa2Cu3O7"),
+    ("Lead", "Pb"),
+    ("Graphite", "C"),
+    ("Strontium Titanate", "SrTiO3"),
+    ("Tungsten", "W"),
+    ("Platinum", "Pt"),
+    ("Barium", "Ba"),
+]
+
 # --- Central Search ---
 st.subheader("🔎 Search for a Material")
 col1, col2 = st.columns([3, 1])
 with col1:
     search_query = st.text_input("Enter chemical formula or material ID (e.g., SiO2, Ba, mp-149)", 
-                                  placeholder="e.g., SiO2, LiFePO4, Ba")
+                                  placeholder="e.g., SiO2, LiFePO4, Ba", key="search_input")
 with col2:
     search_button = st.button("Search", type="primary", use_container_width=True)
 
+# --- BROWSE POPULAR MATERIALS ---
+st.subheader("📚 Or Browse Popular Materials")
+
+# Random button
+if st.button("🎲 Random Material", use_container_width=True):
+    _, random_formula = random.choice(POPULAR_MATERIALS)
+    st.session_state.search_query_override = random_formula
+    st.rerun()
+
+# Grid of material buttons
+cols_per_row = 5
+for i in range(0, len(POPULAR_MATERIALS), cols_per_row):
+    row_cols = st.columns(cols_per_row)
+    for j, (name, formula) in enumerate(POPULAR_MATERIALS[i:i+cols_per_row]):
+        with row_cols[j]:
+            if st.button(f"{name}\n`{formula}`", key=f"pop_{formula}_{i}_{j}", use_container_width=True):
+                st.session_state.search_query_override = formula
+                st.rerun()
+
+# Handle browse clicks
+if "search_query_override" in st.session_state:
+    search_query = st.session_state.search_query_override
+    del st.session_state.search_query_override
+    search_button = True  # Trigger search
+
 # --- Fetch Results ---
-if search_button and search_query.strip():
+if search_button and search_query and search_query.strip():
     with st.spinner("Searching..."):
         try:
             with MPRester(api_key) as mpr:
                 q = search_query.strip()
                 
-                # If it looks like a material ID (starts with mp-)
                 if q.startswith("mp-"):
                     docs = mpr.materials.summary.search(
                         material_ids=[q],
@@ -41,7 +94,6 @@ if search_button and search_query.strip():
                                 "elements", "theoretical", "deprecated"]
                     )
                 else:
-                    # Search by formula
                     docs = mpr.materials.summary.search(
                         formula=q,
                         fields=["material_id", "formula_pretty", "band_gap", "density", 
@@ -66,7 +118,6 @@ if search_button and search_query.strip():
 if "search_results" in st.session_state and st.session_state.search_results:
     docs = st.session_state.search_results
     
-    # If multiple results, let user pick one
     if len(docs) > 1:
         options = [f"{d.formula_pretty} ({d.material_id})" for d in docs]
         selected = st.selectbox("Multiple matches found — select one:", options, 
@@ -96,13 +147,12 @@ if "search_results" in st.session_state and st.session_state.search_results:
         else:
             st.info("🧪 Experimental")
     
-    # --- 3D STRUCTURE (Prominent) ---
+    # --- 3D STRUCTURE ---
     st.subheader("🧊 Crystal Structure")
     
     if d.structure:
         struct = d.structure
         
-        # Convert to conventional cell
         try:
             sga = SpacegroupAnalyzer(struct)
             struct = sga.get_conventional_standard_structure()
@@ -112,7 +162,6 @@ if "search_results" in st.session_state and st.session_state.search_results:
         coords = struct.cart_coords
         species = [str(site.specie) for site in struct]
         
-        # CPK colors
         color_map = {
             "H": "#FFFFFF", "He": "#D9FFFF", "Li": "#CC80FF", "Be": "#C2FF00",
             "B": "#FFB5B5", "C": "#909090", "N": "#3050F8", "O": "#FF0D0D",
@@ -152,7 +201,6 @@ if "search_results" in st.session_state and st.session_state.search_results:
             hovertemplate='<b>%{text}</b><br>x: %{x:.3f} Å<br>y: %{y:.3f} Å<br>z: %{z:.3f} Å<extra></extra>'
         )])
         
-        # Lattice box
         lattice = struct.lattice
         corners = [[0,0,0], [1,0,0], [1,1,0], [0,1,0], [0,0,1], [1,0,1], [1,1,1], [0,1,1]]
         corner_coords = [lattice.get_cartesian_coords(c) for c in corners]
@@ -177,7 +225,6 @@ if "search_results" in st.session_state and st.session_state.search_results:
         )
         st.plotly_chart(fig_3d, use_container_width=True)
         
-        # Lattice constants
         lc1, lc2, lc3, lc4, lc5, lc6 = st.columns(6)
         lc1.metric("a", f"{struct.lattice.a:.3f} Å")
         lc2.metric("b", f"{struct.lattice.b:.3f} Å")
@@ -191,7 +238,6 @@ if "search_results" in st.session_state and st.session_state.search_results:
     # --- PROPERTIES GRID ---
     st.subheader("📊 Properties")
     
-    # Row 1: Electronic & Basic
     r1c1, r1c2, r1c3, r1c4 = st.columns(4)
     with r1c1:
         gap = d.band_gap if d.band_gap is not None else 0
@@ -211,7 +257,6 @@ if "search_results" in st.session_state and st.session_state.search_results:
     with r1c4:
         st.metric("Atoms / Cell", d.nsites)
     
-    # Row 2: Thermodynamic
     st.markdown("**Thermodynamic Properties**")
     r2c1, r2c2, r2c3 = st.columns(3)
     with r2c1:
@@ -223,7 +268,6 @@ if "search_results" in st.session_state and st.session_state.search_results:
     with r2c3:
         st.metric("Stability", "Stable" if d.is_stable else "Unstable")
     
-    # Row 3: Crystal & Symmetry
     st.markdown("**Crystal Structure**")
     r3c1, r3c2, r3c3 = st.columns(3)
     with r3c1:
@@ -236,7 +280,6 @@ if "search_results" in st.session_state and st.session_state.search_results:
         sg_num = d.symmetry.number if d.symmetry else "—"
         st.metric("Space Group #", sg_num)
     
-    # Row 4: Composition
     st.markdown("**Composition**")
     if d.elements:
         elems = sorted(d.elements)
@@ -248,7 +291,6 @@ if "search_results" in st.session_state and st.session_state.search_results:
         with r4c2:
             st.metric("Avg. Atomic Mass", f"{avg_mass:.2f} amu")
         
-        # Element detail cards
         elem_cols = st.columns(len(elems))
         for i, elem in enumerate(elems):
             el = Element(elem)
@@ -258,7 +300,6 @@ if "search_results" in st.session_state and st.session_state.search_results:
                 st.caption(f"Mass: {el.atomic_mass:.2f}")
                 st.caption(f"Radius: {el.atomic_radius} pm" if el.atomic_radius else "Radius: —")
     
-    # Raw data expander
     with st.expander("📄 View Raw Data"):
         raw_data = {
             "Material ID": d.material_id,
@@ -284,5 +325,5 @@ else:
     ### 👋 Welcome
     
     Enter a chemical formula (e.g., `SiO2`, `Ba`, `LiFePO4`) or a Materials Project ID (e.g., `mp-149`) 
-    in the search box above and click **Search** to see all properties for that material.
+    in the search box above, click **Search**, or pick a material from the browse grid below.
     """)
