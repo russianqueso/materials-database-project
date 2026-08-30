@@ -3,6 +3,7 @@ import plotly.graph_objects as go
 from mp_api.client import MPRester
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.core import Element
+import periodictable as pt
 import random
 
 st.set_page_config(page_title="Materials Explorer", layout="wide")
@@ -56,13 +57,11 @@ with col2:
 # --- BROWSE POPULAR MATERIALS ---
 st.subheader("📚 Or Browse Popular Materials")
 
-# Random button
 if st.button("🎲 Random Material", use_container_width=True):
     _, random_formula = random.choice(POPULAR_MATERIALS)
     st.session_state.search_query_override = random_formula
     st.rerun()
 
-# Grid of material buttons
 cols_per_row = 5
 for i in range(0, len(POPULAR_MATERIALS), cols_per_row):
     row_cols = st.columns(cols_per_row)
@@ -72,11 +71,10 @@ for i in range(0, len(POPULAR_MATERIALS), cols_per_row):
                 st.session_state.search_query_override = formula
                 st.rerun()
 
-# Handle browse clicks
 if "search_query_override" in st.session_state:
     search_query = st.session_state.search_query_override
     del st.session_state.search_query_override
-    search_button = True  # Trigger search
+    search_button = True
 
 # --- Fetch Results ---
 if search_button and search_query and search_query.strip():
@@ -131,7 +129,6 @@ if "search_results" in st.session_state and st.session_state.search_results:
     
     # --- HEADER ---
     st.divider()
-    
     st.header(d.formula_pretty)
     st.caption(f"Material ID: `{d.material_id}`")
     
@@ -246,15 +243,14 @@ if "search_results" in st.session_state and st.session_state.search_results:
         st.metric("Atoms / Cell", d.nsites)
     
     st.markdown("**Thermodynamic Properties**")
-    r2c1, r2c2, r2c3 = st.columns(3)
+    r2c1, r2c2 = st.columns(2)
     with r2c1:
         hull = d.energy_above_hull if d.energy_above_hull is not None else 0
         st.metric("Energy Above Hull", f"{hull:.4f} eV/atom")
     with r2c2:
         form = d.formation_energy_per_atom if d.formation_energy_per_atom is not None else 0
         st.metric("Formation Energy", f"{form:.3f} eV/atom")
-    with r2c3:
-        st.metric("Stability", "Stable" if d.is_stable else "Unstable")
+    # NOTE: Stability metric removed per user request
     
     st.markdown("**Crystal Structure**")
     r3c1, r3c2, r3c3 = st.columns(3)
@@ -270,38 +266,35 @@ if "search_results" in st.session_state and st.session_state.search_results:
     
     st.markdown("**Composition**")
     if d.elements:
-        elems = sorted(d.elements)
+        elems = sorted([str(e) for e in d.elements])
         avg_mass = sum(Element(e).atomic_mass for e in elems) / len(elems)
         
         r4c1, r4c2 = st.columns(2)
         with r4c1:
-            st.metric("Elements", ", ".join(elems))
+            st.markdown(f"**Elements:** {', '.join(elems)}")
         with r4c2:
             st.metric("Avg. Atomic Mass", f"{avg_mass:.2f} amu")
         
+        # Element detail cards
         elem_cols = st.columns(len(elems))
         for i, elem in enumerate(elems):
             el = Element(elem)
             with elem_cols[i]:
                 st.markdown(f"**{elem}** — *{el.long_name}*")
                 
-                # Basic properties
                 st.caption(f"🔢 Z = {el.Z}")
                 st.caption(f"⚖️ Mass: {el.atomic_mass:.3f} amu")
                 
-                # Group & Period
                 group = el.group if hasattr(el, 'group') else "—"
                 period = el.row if hasattr(el, 'row') else "—"
                 st.caption(f"📊 Group {group}, Period {period}")
                 
-                # Electronegativity
                 en = el.electronegativity() if callable(el.electronegativity) else el.electronegativity
                 if en:
-                    st.caption(f"⚡ EN = {en:.2f} (Pauling)")
+                    st.caption(f"⚡ EN = {en:.2f}")
                 else:
                     st.caption("⚡ EN = —")
                 
-                # Oxidation states
                 ox = el.common_oxidation_states if hasattr(el, 'common_oxidation_states') else []
                 if ox:
                     ox_str = ", ".join([f"{o:+.0f}" if o != 0 else "0" for o in sorted(ox)])
@@ -309,14 +302,12 @@ if "search_results" in st.session_state and st.session_state.search_results:
                 else:
                     st.caption("🔋 Ox: —")
                 
-                # Electron config
                 es = el.electronic_structure if hasattr(el, 'electronic_structure') else None
                 if es:
                     st.caption(f"🌀 {es}")
                 else:
                     st.caption("🌀 —")
                 
-                # Radii
                 r_cov = el.atomic_radius if hasattr(el, 'atomic_radius') else None
                 r_vdw = el.van_der_waals_radius if hasattr(el, 'van_der_waals_radius') else None
                 if r_cov:
@@ -325,6 +316,24 @@ if "search_results" in st.session_state and st.session_state.search_results:
                     st.caption(f"📏 VdW: {r_vdw} pm")
                 else:
                     st.caption("📏 Radius: —")
+                
+                # ISOTOPES (new)
+                try:
+                    pt_elem = getattr(pt, elem, None)
+                    if pt_elem:
+                        isos = [(iso.mass, iso.abundance) for iso in pt_elem if iso.abundance and iso.abundance > 0]
+                        isos.sort(key=lambda x: x[1], reverse=True)
+                        if isos:
+                            iso_lines = [f"**{elem}-{int(mass)}** ({abund:.2f}%)" for mass, abund in isos[:4]]
+                            st.caption("☢️ Isotopes:")
+                            for line in iso_lines:
+                                st.caption(line)
+                        else:
+                            st.caption("☢️ No stable isotopes")
+                    else:
+                        st.caption("☢️ —")
+                except Exception:
+                    st.caption("☢️ —")
     
     with st.expander("📄 View Raw Data"):
         raw_data = {
