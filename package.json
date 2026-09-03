@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "serve public",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "serve": "^14.2.4",
+    "vercel": "^48.0.0"
+  }
+}
