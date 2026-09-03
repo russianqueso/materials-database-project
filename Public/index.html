@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Search selected Materials Project properties by formula or material ID.">
+    <title>Materials Explorer</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="hero">
+        <p class="eyebrow">Materials Project data</p>
+        <h1>Materials Explorer</h1>
+        <p class="intro">Search by chemical formula or Materials Project ID to inspect key material properties.</p>
+      </header>
+
+      <section class="search-card" aria-labelledby="search-heading">
+        <h2 id="search-heading">Find a material</h2>
+        <form id="search-form" class="search-form" role="search">
+          <label for="material-query">Formula or material ID</label>
+          <div class="search-controls">
+            <input
+              id="material-query"
+              name="q"
+              type="search"
+              placeholder="Try LiFePO4 or mp-149"
+              autocomplete="off"
+              maxlength="100"
+              required
+            >
+            <button id="search-submit" type="submit">Search</button>
+          </div>
+        </form>
+
+        <div class="popular" aria-labelledby="popular-heading">
+          <h3 id="popular-heading">Popular materials</h3>
+          <div class="shortcut-list">
+            <button type="button" class="shortcut" data-query="Si">Silicon</button>
+            <button type="button" class="shortcut" data-query="GaAs">Gallium Arsenide</button>
+            <button type="button" class="shortcut" data-query="LiFePO4">Lithium Iron Phosphate</button>
+            <button type="button" class="shortcut" data-query="MoS2">Molybdenum Disulfide</button>
+            <button type="button" class="shortcut" data-query="BaTiO3">Barium Titanate</button>
+            <button type="button" class="shortcut" data-query="Cu">Copper</button>
+            <button type="button" class="shortcut" data-query="Al2O3">Aluminum Oxide</button>
+            <button type="button" class="shortcut" data-query="TiO2">Titanium Dioxide</button>
+            <button type="button" class="shortcut" data-query="ZnO">Zinc Oxide</button>
+            <button type="button" class="shortcut" data-query="NaCl">Sodium Chloride</button>
+            <button type="button" class="shortcut" data-query="C">Diamond</button>
+            <button type="button" class="shortcut" data-query="Fe">Iron</button>
+            <button type="button" class="shortcut" data-query="Au">Gold</button>
+            <button type="button" class="shortcut" data-query="MgO">Magnesium Oxide</button>
+            <button type="button" class="shortcut" data-query="CsCl">Cesium Chloride</button>
+            <button type="button" class="shortcut" data-query="LiCoO2">Lithium Cobalt Oxide</button>
+            <button type="button" class="shortcut" data-query="CaCO3">Calcium Carbonate</button>
+            <button type="button" class="shortcut" data-query="SiO2">Quartz</button>
+            <button type="button" class="shortcut" data-query="YBa2Cu3O7">Yttrium Barium Copper Oxide</button>
+            <button type="button" class="shortcut" data-query="Pb">Lead</button>
+            <button type="button" class="shortcut" data-query="C">Graphite</button>
+            <button type="button" class="shortcut" data-query="SrTiO3">Strontium Titanate</button>
+            <button type="button" class="shortcut" data-query="W">Tungsten</button>
+            <button type="button" class="shortcut" data-query="Pt">Platinum</button>
+            <button type="button" class="shortcut" data-query="Ba">Barium</button>
+            <button type="button" class="shortcut" data-query="mp-149">mp-149</button>
+            <button id="random-material" type="button" class="shortcut random-material">Random material</button>
+          </div>
+        </div>
+
+        <p
+          id="search-status"
+          class="status"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        ></p>
+      </section>
+
+      <section id="results-panel" class="results-panel" aria-label="Search results" hidden>
+        <div id="result-select-wrap" class="result-picker" hidden>
+          <label for="result-select">Choose a result</label>
+          <select id="result-select"></select>
+        </div>
+
+        <div id="material-details"></div>
+
+        <section class="viewer-panel" aria-labelledby="viewer-heading">
+          <div class="viewer-heading-row">
+            <h2 id="viewer-heading">Crystal structure</h2>
+            <span class="viewer-badge">3D preview</span>
+          </div>
+          <div
+            id="viewer"
+            class="viewer"
+            role="region"
+            aria-label="Crystal structure preview"
+          ></div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
